@@ -6,6 +6,7 @@ import { CreateTaskDto } from '../dto/create-task.dto';
 import { TaskStatus } from '../entity/tasks-status.enum';
 import { GetTasksFilterDto } from '../dto/get-tasks-filter.dto';
 import { User } from '../../auth/entity/user.entity';
+import { BaseResponse } from '../../../common/base-response';
 
 @Injectable()
 export class TasksService {
@@ -14,19 +15,25 @@ export class TasksService {
     private tasksRepository: TasksRepository,
   ) {}
 
-  getTasks(filterDto: GetTasksFilterDto, user: User): Promise<Task[]> {
+  getTasks(
+    filterDto: GetTasksFilterDto,
+    user: User,
+  ): Promise<BaseResponse<Task[]>> {
     return this.tasksRepository.getTasks(filterDto, user);
   }
 
-  async getTaskById(id: string, user: User): Promise<Task> {
+  async getTaskById(id: string, user: User): Promise<BaseResponse<Task>> {
     return this.tasksRepository.getTaskById(id, user);
   }
 
-  async createTask(createTaskDto: CreateTaskDto, user: User): Promise<Task> {
+  async createTask(
+    createTaskDto: CreateTaskDto,
+    user: User,
+  ): Promise<BaseResponse<Task>> {
     return this.tasksRepository.createTask(createTaskDto, user);
   }
 
-  async deleteTaskById(id: string, user: User): Promise<void> {
+  async deleteTaskById(id: string, user: User): Promise<BaseResponse<any>> {
     return this.tasksRepository.deleteTaskById(id, user);
   }
 
@@ -34,7 +41,7 @@ export class TasksService {
     id: string,
     status: TaskStatus,
     user: User,
-  ): Promise<Task> {
+  ): Promise<BaseResponse<Task>> {
     return this.tasksRepository.updateTaskStatus(id, status, user);
   }
 }

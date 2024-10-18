@@ -4,15 +4,20 @@ import {
   ConflictException,
   InternalServerErrorException,
   UnauthorizedException,
+  Logger,
 } from '@nestjs/common';
 import { User } from '../entity/user.entity';
 import { AuthCredentialsDto } from '../dto/auth-credentials.dto';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { JwtPayload } from '../../../jwt/jwt-payload.interfaces';
+import { BaseResponse } from '../../../common/base-response';
+import { executeQueryWithLogging } from '../../../common/query-helpers';
 
 @Injectable()
 export class UserRepository extends Repository<User> {
+  private logger = new Logger('UserRepository');
+
   constructor(
     protected dataSource: DataSource,
     private jwtService: JwtService,
@@ -20,7 +25,9 @@ export class UserRepository extends Repository<User> {
     super(User, dataSource.createEntityManager());
   }
 
-  async createUser(authCredentialsDto: AuthCredentialsDto): Promise<void> {
+  async createUser(
+    authCredentialsDto: AuthCredentialsDto,
+  ): Promise<BaseResponse<any>> {
     const { username, password } = authCredentialsDto;
 
     const salt = await bcrypt.genSalt();
@@ -29,6 +36,13 @@ export class UserRepository extends Repository<User> {
     const user = this.create({ username, password: hashedPassword });
     try {
       await this.save(user);
+      return executeQueryWithLogging(
+        this.logger,
+        user.username,
+        'createUser()',
+        'createUser successfully',
+        () => null,
+      );
     } catch (error) {
       // duplicate username
       if (error.code === '23505') {
@@ -41,7 +55,7 @@ export class UserRepository extends Repository<User> {
 
   async signIn(
     authCredentialsDto: AuthCredentialsDto,
-  ): Promise<{ accessToken: string }> {
+  ): Promise<BaseResponse<any>> {
     const { username, password } = authCredentialsDto;
     const user = await this.findOne({
       where: { username },
@@ -50,7 +64,14 @@ export class UserRepository extends Repository<User> {
     if (user && (await bcrypt.compare(password, user.password))) {
       const payload: JwtPayload = { username };
       const accessToken: string = this.jwtService.sign(payload);
-      return { accessToken };
+
+      return executeQueryWithLogging(
+        this.logger,
+        user.username,
+        'signIn()',
+        'signIn successfully',
+        () => Promise.resolve({ accessToken }),
+      );
     } else {
       throw new UnauthorizedException('Please check your login credentials');
     }

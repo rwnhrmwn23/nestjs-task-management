@@ -1,18 +1,25 @@
 import { DataSource, Repository } from 'typeorm';
 import { Task } from '../entity/tasks.entity';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { CreateTaskDto } from '../dto/create-task.dto';
 import { TaskStatus } from '../entity/tasks-status.enum';
 import { GetTasksFilterDto } from '../dto/get-tasks-filter.dto';
 import { User } from '../../auth/entity/user.entity';
+import { executeQueryWithLogging } from '../../../common/query-helpers';
+import { BaseResponse } from '../../../common/base-response';
 
 @Injectable()
 export class TasksRepository extends Repository<Task> {
+  private logger = new Logger('TasksRepository');
+
   constructor(protected dataSource: DataSource) {
     super(Task, dataSource.createEntityManager());
   }
 
-  async getTasks(filterDto: GetTasksFilterDto, user: User): Promise<Task[]> {
+  async getTasks(
+    filterDto: GetTasksFilterDto,
+    user: User,
+  ): Promise<BaseResponse<Task[]>> {
     const { status, search } = filterDto;
 
     const query = this.createQueryBuilder('task');
@@ -29,22 +36,39 @@ export class TasksRepository extends Repository<Task> {
       );
     }
 
-    return await query.getMany();
+    const getData = query.getMany();
+
+    return await executeQueryWithLogging(
+      this.logger,
+      user.username,
+      'getTasks()',
+      'Tasks retrieved successfully',
+      () => getData,
+    );
   }
 
-  async getTaskById(id: string, user: User): Promise<Task> {
-    const found = await this.findOne({
+  async getTaskById(id: string, user: User): Promise<BaseResponse<Task>> {
+    const task = this.findOne({
       where: { id, user },
     });
 
-    if (!found) {
-      throw new NotFoundException(`Task with ${id} not found!`);
+    if (!task) {
+      throw new NotFoundException(`Task with ID ${id} not found`);
     }
 
-    return found;
+    return await executeQueryWithLogging(
+      this.logger,
+      user.username,
+      'getTaskById()',
+      'Tasks by id retrieved successfully',
+      () => task,
+    );
   }
 
-  async createTask(createTaskDto: CreateTaskDto, user: User): Promise<Task> {
+  async createTask(
+    createTaskDto: CreateTaskDto,
+    user: User,
+  ): Promise<BaseResponse<Task>> {
     const { title, description } = createTaskDto;
 
     const task = this.create({
@@ -54,16 +78,30 @@ export class TasksRepository extends Repository<Task> {
       user,
     });
 
-    await this.save(task);
+    const saveTask = this.save(task);
 
-    return task;
+    return executeQueryWithLogging(
+      this.logger,
+      user.username,
+      'createTask()',
+      'Tasks created successfully',
+      () => saveTask,
+    );
   }
 
-  async deleteTaskById(id: string, user: User): Promise<void> {
+  async deleteTaskById(id: string, user: User): Promise<BaseResponse<any>> {
     const result = await this.delete({ id, user });
 
     if (result.affected === 0) {
       throw new NotFoundException(`Task with ${id} not found!`);
+    } else {
+      return executeQueryWithLogging(
+        this.logger,
+        user.username,
+        'deleteTaskById()',
+        'Tasks deleted successfully',
+        () => null,
+      );
     }
   }
 
@@ -71,12 +109,24 @@ export class TasksRepository extends Repository<Task> {
     id: string,
     status: TaskStatus,
     user: User,
-  ): Promise<Task> {
-    const task = await this.getTaskById(id, user);
+  ): Promise<BaseResponse<Task>> {
+    const result = await this.getTaskById(id, user);
 
-    task.status = status;
-    await this.save(task);
+    if (!result || !result.data) {
+      throw new NotFoundException(
+        `Task with ID ${id} not found for user ${user.username}`,
+      );
+    } else {
+      result.data.status = status;
+      const saveTask = this.save(result.data);
 
-    return task;
+      return executeQueryWithLogging(
+        this.logger,
+        user.username,
+        'updateTaskStatus()',
+        'Tasks updated successfully',
+        () => saveTask,
+      );
+    }
   }
 }

@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Logger,
   Param,
   Patch,
   Post,
@@ -17,22 +18,31 @@ import { Task } from '../entity/tasks.entity';
 import { AuthGuard } from '@nestjs/passport';
 import { GetUser } from '../../../common/get-user.decorator';
 import { User } from '../../auth/entity/user.entity';
+import { BaseResponse } from '../../../common/base-response';
 
 @Controller('tasks')
 @UseGuards(AuthGuard())
 export class TasksController {
+  private logger = new Logger('TasksController');
   constructor(private tasksService: TasksService) {}
 
   @Get()
   getTasks(
     @Query() filterDto: GetTasksFilterDto,
     @GetUser() user: User,
-  ): Promise<Task[]> {
+  ): Promise<BaseResponse<Task[]>> {
+    this.logger.verbose(
+      `User ${user.username} retrieving all tasks. 
+      Filters ${JSON.stringify(filterDto)}`,
+    );
     return this.tasksService.getTasks(filterDto, user);
   }
 
   @Get('/:id')
-  getTaskById(@Param('id') id: string, @GetUser() user: User): Promise<Task> {
+  getTaskById(
+    @Param('id') id: string,
+    @GetUser() user: User,
+  ): Promise<BaseResponse<Task>> {
     return this.tasksService.getTaskById(id, user);
   }
 
@@ -40,7 +50,11 @@ export class TasksController {
   createTask(
     @Body() createTaskDto: CreateTaskDto,
     @GetUser() user: User,
-  ): Promise<Task> {
+  ): Promise<BaseResponse<Task>> {
+    this.logger.verbose(
+      `User ${user.username} creating new task. 
+      Data ${JSON.stringify(createTaskDto)}`,
+    );
     return this.tasksService.createTask(createTaskDto, user);
   }
 
@@ -49,7 +63,7 @@ export class TasksController {
     @Param('id') id: string,
     @Body() updateTaskStatusDto: UpdateTaskStatusDto,
     @GetUser() user: User,
-  ): Promise<Task> {
+  ): Promise<BaseResponse<Task>> {
     const { status } = updateTaskStatusDto;
     return this.tasksService.updateTaskStatus(id, status, user);
   }
@@ -58,7 +72,7 @@ export class TasksController {
   deleteTaskById(
     @Param('id') id: string,
     @GetUser() user: User,
-  ): Promise<void> {
+  ): Promise<BaseResponse<any>> {
     return this.tasksService.deleteTaskById(id, user);
   }
 }
