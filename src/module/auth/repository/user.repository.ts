@@ -5,11 +5,11 @@ import {
   InternalServerErrorException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { User } from './entity/user.entity';
-import { AuthCredentialsDto } from './dto/auth-credentials.dto';
+import { User } from '../entity/user.entity';
+import { AuthCredentialsDto } from '../dto/auth-credentials.dto';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
-import { JwtPayload } from './jwt/jwt-payload.interfaces';
+import { JwtPayload } from '../../../jwt/jwt-payload.interfaces';
 
 @Injectable()
 export class UserRepository extends Repository<User> {
